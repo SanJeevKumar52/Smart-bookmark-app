@@ -15,42 +15,62 @@ export default function Dashboard() {
 
     useEffect(() => {
 
-        checkUser();
+  const init = async () => {
 
-        // Create realtime subscription FIRST
-        const channel = supabase
-            .channel("bookmarks-channel")
-            .on(
-                "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "bookmarks",
-                },
-                (payload) => {
+    // Wait for auth session
+    const { data: { session } } = await supabase.auth.getSession();
 
-                    if (payload.eventType === "INSERT") {
-                        setBookmarks((prev) => [payload.new, ...prev]);
-                    }
+    if (!session) {
+      router.push("/login");
+      return;
+    }
 
-                    if (payload.eventType === "DELETE") {
-                        setBookmarks((prev) =>
-                            prev.filter((b) => b.id !== payload.old.id)
-                        );
-                    }
+    setUser(session.user);
 
-                }
-            )
-            .subscribe();
+    // Fetch initial bookmarks
+    const { data } = await supabase
+      .from("bookmarks")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-        // Then fetch initial data
-        fetchBookmarks();
+    setBookmarks(data || []);
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+    // Now subscribe AFTER session ready
+    const channel = supabase
+      .channel("bookmarks-channel")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "bookmarks",
+        },
+        (payload) => {
 
-    }, []);
+          if (payload.eventType === "INSERT") {
+            setBookmarks((prev) => [payload.new, ...prev]);
+          }
+
+          if (payload.eventType === "DELETE") {
+            setBookmarks((prev) =>
+              prev.filter((b) => b.id !== payload.old.id)
+            );
+          }
+
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+
+  };
+
+  init();
+
+}, []);
+
 
 
     // Check logged in user
