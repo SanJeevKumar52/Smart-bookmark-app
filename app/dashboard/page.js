@@ -15,61 +15,64 @@ export default function Dashboard() {
 
     useEffect(() => {
 
-  const init = async () => {
+        const init = async () => {
 
-    // Wait for auth session
-    const { data: { session } } = await supabase.auth.getSession();
+            // Wait for auth session
+            const { data: { session } } = await supabase.auth.getSession();
 
-    if (!session) {
-      router.push("/login");
-      return;
-    }
+            if (!session) {
+                router.push("/login");
+                return;
+            }
 
-    setUser(session.user);
+            setUser(session.user);
 
-    // Fetch initial bookmarks
-    const { data } = await supabase
-      .from("bookmarks")
-      .select("*")
-      .order("created_at", { ascending: false });
+            // Fetch initial bookmarks
+            const { data } = await supabase
+                .from("bookmarks")
+                .select("*")
+                .eq("user_id", session.user.id)
+                .order("created_at", { ascending: false });
 
-    setBookmarks(data || []);
+            setBookmarks(data || []);
 
-    // Now subscribe AFTER session ready
-    const channel = supabase
-      .channel("bookmarks-channel")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "bookmarks",
-        },
-        (payload) => {
+            // Now subscribe AFTER session ready
+            const channel = supabase
+                .channel("bookmarks-channel")
+                .on(
+                    "postgres_changes",
+                    {
+                        event: "*",
+                        schema: "public",
+                        table: "bookmarks",
+                        filter: `user_id=eq.${session.user.id}`,
+                    },
 
-          if (payload.eventType === "INSERT") {
-            setBookmarks((prev) => [payload.new, ...prev]);
-          }
+                    (payload) => {
 
-          if (payload.eventType === "DELETE") {
-            setBookmarks((prev) =>
-              prev.filter((b) => b.id !== payload.old.id)
-            );
-          }
+                        if (payload.eventType === "INSERT") {
+                            setBookmarks((prev) => [payload.new, ...prev]);
+                        }
 
-        }
-      )
-      .subscribe();
+                        if (payload.eventType === "DELETE") {
+                            setBookmarks((prev) =>
+                                prev.filter((b) => b.id !== payload.old.id)
+                            );
+                        }
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+                    }
+                )
+                .subscribe();
 
-  };
+            return () => {
+                supabase.removeChannel(channel);
+            };
 
-  init();
+        };
 
-}, []);
+        init();
+
+    }, []);
 
 
 
@@ -89,9 +92,12 @@ export default function Dashboard() {
     // Fetch bookmarks
     const fetchBookmarks = async () => {
 
+        const { data: { session } } = await supabase.auth.getSession();
+
         const { data, error } = await supabase
             .from("bookmarks")
             .select("*")
+            .eq("user_id", session.user.id)
             .order("created_at", { ascending: false });
 
         if (!error) {
@@ -99,6 +105,7 @@ export default function Dashboard() {
         }
 
     };
+
 
     // Add bookmark
     const addBookmark = async () => {
