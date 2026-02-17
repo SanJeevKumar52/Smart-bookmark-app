@@ -8,7 +8,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "http://localhost:3000/dashboard",
+       redirectTo: "https://smart-bookmark-app-rho-seven.vercel.app/dashboard",
       },
     });
 
