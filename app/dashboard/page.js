@@ -38,31 +38,38 @@ export default function Dashboard() {
 
             // Now subscribe AFTER session ready
             const channel = supabase
-                .channel("bookmarks-channel")
+                .channel(`bookmarks-${session.user.id}`)
+
                 .on(
                     "postgres_changes",
                     {
-                        event: "*",
+                        event: "INSERT",
                         schema: "public",
                         table: "bookmarks",
                         filter: `user_id=eq.${session.user.id}`,
                     },
-
                     (payload) => {
-
-                        if (payload.eventType === "INSERT") {
-                            setBookmarks((prev) => [payload.new, ...prev]);
-                        }
-
-                        if (payload.eventType === "DELETE") {
-                            setBookmarks((prev) =>
-                                prev.filter((b) => b.id !== payload.old.id)
-                            );
-                        }
-
+                        setBookmarks(prev => [payload.new, ...prev]);
                     }
                 )
+
+                .on(
+                    "postgres_changes",
+                    {
+                        event: "DELETE",
+                        schema: "public",
+                        table: "bookmarks",
+                        filter: `user_id=eq.${session.user.id}`,
+                    },
+                    (payload) => {
+                        setBookmarks(prev =>
+                            prev.filter(b => b.id !== payload.old.id)
+                        );
+                    }
+                )
+
                 .subscribe();
+
 
             return () => {
                 supabase.removeChannel(channel);
