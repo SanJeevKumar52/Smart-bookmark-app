@@ -131,30 +131,90 @@ export default function Dashboard() {
     }, [router]);
 
 
-    // ADD BOOKMARK
-    const addBookmark = async () => {
+    function isValidWebsite(value) {
+    try {
+        let input = value.trim();
 
-        if (!title.trim() || !url.trim()) return;
-
-        const { data: { user } } = await supabase.auth.getUser();
-
-        const { error } = await supabase
-            .from("bookmarks")
-            .insert({
-                title,
-                url,
-                user_id: user.id,
-            });
-
-        if (!error) {
-            setTitle("");
-            setUrl("");
+        // auto add https if missing
+        if (!input.startsWith("http://") && !input.startsWith("https://")) {
+            input = "https://" + input;
         }
 
-        // DO NOT call fetchBookmarks()
-        // realtime handles it
+        const parsed = new URL(input);
 
-    };
+        // must have dot in hostname
+        if (!parsed.hostname.includes(".")) {
+            return false;
+        }
+
+        // extension minimum 2 letters
+        const parts = parsed.hostname.split(".");
+        const extension = parts[parts.length - 1];
+
+        if (extension.length < 2) {
+            return false;
+        }
+
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function isValidDomain(value) {
+    const input = value.trim();
+
+    const domainRegex =
+        /^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
+
+    return domainRegex.test(input);
+}
+
+
+
+
+    // ADD BOOKMARK
+ const addBookmark = async () => {
+
+    const trimmedTitle = title.trim();
+    const trimmedUrl = url.trim();
+
+    if (!trimmedTitle || !trimmedUrl) {
+        alert("Title and URL required");
+        return;
+    }
+
+    if (!isValidDomain(trimmedUrl)) {
+        alert("Enter valid domain like google.com or kalvig.in");
+        return;
+    }
+
+    const formattedUrl = "https://" + trimmedUrl;
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        alert("User not authenticated");
+        return;
+    }
+
+    const { error } = await supabase
+        .from("bookmarks")
+        .insert({
+            title: trimmedTitle,
+            url: formattedUrl,
+            user_id: user.id,
+        });
+
+    if (error) {
+        console.error(error);
+        alert("Failed to save bookmark");
+        return;
+    }
+
+    setTitle("");
+    setUrl("");
+};
 
 
     // DELETE BOOKMARK
